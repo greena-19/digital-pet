@@ -1,30 +1,73 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:digital_pet/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Digital Pet app loads correctly', (WidgetTester tester) async {
+    await tester.pumpWidget(const DigitalPetApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Digital Pet'), findsOneWidget);
+    expect(find.text('Pip'), findsOneWidget);
+    expect(find.text('Happiness'), findsOneWidget);
+    expect(find.text('Hunger'), findsOneWidget);
+    expect(find.text('Energy'), findsOneWidget);
+    expect(find.text('Feed'), findsOneWidget);
+    expect(find.text('Play'), findsOneWidget);
+    expect(find.text('Reset'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('Pet starts with correct values', (WidgetTester tester) async {
+    await tester.pumpWidget(const DigitalPetApp());
+
+    expect(find.text('50 / 100'), findsNWidgets(2));
+    expect(find.text('70 / 100'), findsOneWidget);
+  });
+
+  testWidgets('Feed changes pet values', (WidgetTester tester) async {
+    await tester.pumpWidget(const DigitalPetApp());
+
+    // Scroll until the Feed button is visible.
+    await tester.ensureVisible(find.text('Feed'));
+
+    await tester.tap(find.text('Feed'));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Hunger: 50 -> 40
+    // Happiness: 50 -> 60
+    // Energy: 70 -> 75
+    expect(find.text('40 / 100'), findsOneWidget);
+    expect(find.text('60 / 100'), findsOneWidget);
+    expect(find.text('75 / 100'), findsOneWidget);
+  });
+
+  testWidgets('Play changes pet values', (WidgetTester tester) async {
+    await tester.pumpWidget(const DigitalPetApp());
+
+    // Scroll until the Play button is visible.
+    await tester.ensureVisible(find.text('Play'));
+
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+
+    // Happiness: 50 -> 65
+    // Hunger: 50 -> 55
+    // Energy: 70 -> 60
+    expect(find.text('65 / 100'), findsOneWidget);
+    expect(find.text('55 / 100'), findsOneWidget);
+    expect(find.text('60 / 100'), findsOneWidget);
+  });
+
+  testWidgets('Reset restores initial values', (WidgetTester tester) async {
+    await tester.pumpWidget(const DigitalPetApp());
+
+    await tester.ensureVisible(find.text('Play'));
+    await tester.tap(find.text('Play'));
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Reset'));
+    await tester.tap(find.text('Reset'));
+    await tester.pump();
+
+    expect(find.text('50 / 100'), findsNWidgets(2));
+    expect(find.text('70 / 100'), findsOneWidget);
   });
 }
