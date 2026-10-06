@@ -1,6 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+
+import 'pet_state.dart';
 
 void main() {
   runApp(const DigitalPetApp());
@@ -29,298 +29,69 @@ class DigitalPetScreen extends StatefulWidget {
   const DigitalPetScreen({super.key});
 
   @override
-  State<DigitalPetScreen> createState() => _DigitalPetScreenState();
+  State<DigitalPetScreen> createState() =>
+      _DigitalPetScreenState();
 }
 
 class _DigitalPetScreenState extends State<DigitalPetScreen> {
-  // ------------------------------------------------------------
-  // PET STATE
-  // ------------------------------------------------------------
+  late final PetState pet;
 
-  String _petName = 'Pip';
+  @override
+  void initState() {
+    super.initState();
 
-  int _happiness = 50;
-  int _hunger = 50;
-  int _energy = 70;
-
-  bool _gameOver = false;
-  bool _hasWon = false;
-
-  // ------------------------------------------------------------
-  // TIMERS
-  // ------------------------------------------------------------
-
-  Timer? _hungerTimer;
-  Timer? _winTimer;
-
-  // ------------------------------------------------------------
-  // HELPER
-  // ------------------------------------------------------------
-
-  int _clampMeter(int value) {
-    return value.clamp(0, 100).toInt();
+    pet = PetState();
+    pet.addListener(_petChanged);
+    pet.start();
   }
 
-  // ------------------------------------------------------------
-  // DERIVED STATE
-  // ------------------------------------------------------------
-
-  String get _mood {
-    if (_happiness > 70) {
-      return 'Happy';
+  void _petChanged() {
+    if (mounted) {
+      setState(() {});
     }
-
-    if (_happiness >= 30) {
-      return 'Neutral';
-    }
-
-    return 'Unhappy';
   }
 
-  Color get _moodColor {
-    if (_happiness > 70) {
+  @override
+  void dispose() {
+    pet.removeListener(_petChanged);
+    pet.dispose();
+
+    super.dispose();
+  }
+
+  Color get moodColor {
+    if (pet.happiness > 70) {
       return Colors.green;
     }
 
-    if (_happiness >= 30) {
+    if (pet.happiness >= 30) {
       return Colors.amber;
     }
 
     return Colors.red;
   }
 
-  String get _petEmoji {
-    if (_hasWon) {
+  String get petEmoji {
+    if (pet.hasWon) {
       return '🏆';
     }
 
-    if (_gameOver) {
+    if (pet.gameOver) {
       return '😴';
     }
 
-    if (_happiness > 70) {
+    if (pet.happiness > 70) {
       return '🐶';
     }
 
-    if (_happiness < 30) {
+    if (pet.happiness < 30) {
       return '🥺';
     }
 
     return '🐕';
   }
 
-  // ------------------------------------------------------------
-  // FEED
-  // ------------------------------------------------------------
-
-  void _feedPet() {
-    if (_gameOver || _hasWon) {
-      return;
-    }
-
-    setState(() {
-      // Feeding reduces hunger.
-      _hunger = _clampMeter(_hunger - 10);
-
-      // If the resulting hunger is below 30,
-      // feeding decreases happiness by 20.
-      //
-      // Otherwise, feeding increases happiness by 10.
-      if (_hunger < 30) {
-        _happiness = _clampMeter(_happiness - 20);
-      } else {
-        _happiness = _clampMeter(_happiness + 10);
-      }
-
-      // Feeding gives a small amount of energy.
-      _energy = _clampMeter(_energy + 5);
-    });
-
-    _updateOutcome();
-  }
-
-  // ------------------------------------------------------------
-  // PLAY
-  // ------------------------------------------------------------
-
-  void _playWithPet() {
-    if (_gameOver || _hasWon) {
-      return;
-    }
-
-    setState(() {
-      // Playing increases happiness.
-      _happiness = _clampMeter(_happiness + 15);
-
-      // Playing makes the pet a little more hungry.
-      _hunger = _clampMeter(_hunger + 5);
-
-      // Playing uses energy.
-      _energy = _clampMeter(_energy - 10);
-    });
-
-    _updateOutcome();
-  }
-
-  // ------------------------------------------------------------
-  // RESET
-  // ------------------------------------------------------------
-
-  void _resetPet() {
-    // Cancel any existing win timer.
-    _winTimer?.cancel();
-    _winTimer = null;
-
-    setState(() {
-      _petName = 'Pip';
-
-      _happiness = 50;
-      _hunger = 50;
-      _energy = 70;
-
-      _gameOver = false;
-      _hasWon = false;
-    });
-
-    // Make sure exactly one hunger timer is active.
-    _startHungerTimer();
-  }
-
-  // ------------------------------------------------------------
-  // OUTCOME LOGIC
-  // ------------------------------------------------------------
-
-  void _updateOutcome() {
-    if (_gameOver || _hasWon) {
-      return;
-    }
-
-    // ----------------------------------------------------------
-    // LOSS CONDITION
-    //
-    // Game over when:
-    // hunger == 100
-    // AND
-    // happiness <= 10
-    // ----------------------------------------------------------
-
-    if (_hunger == 100 && _happiness <= 10) {
-      _winTimer?.cancel();
-      _winTimer = null;
-
-      _hungerTimer?.cancel();
-
-      setState(() {
-        _gameOver = true;
-      });
-
-      return;
-    }
-
-    // ----------------------------------------------------------
-    // WIN TIMER CANCELLATION
-    //
-    // Happiness must be STRICTLY greater than 80.
-    //
-    // If happiness becomes 80 or lower,
-    // cancel the pending win timer.
-    // ----------------------------------------------------------
-
-    if (_happiness <= 80) {
-      _winTimer?.cancel();
-      _winTimer = null;
-      return;
-    }
-
-    // ----------------------------------------------------------
-    // START WIN TIMER
-    //
-    // Happiness is now > 80.
-    //
-    // Start the three-minute timer only if one
-    // is not already running.
-    // ----------------------------------------------------------
-
-    _winTimer ??= Timer(
-      const Duration(minutes: 3),
-      () {
-        _winTimer = null;
-
-        if (!mounted || _gameOver || _happiness <= 80) {
-          return;
-        }
-
-        setState(() {
-          _hasWon = true;
-        });
-
-        // Stop hunger timer after winning.
-        _hungerTimer?.cancel();
-      },
-    );
-  }
-
-  // ------------------------------------------------------------
-  // HUNGER TIMER
-  // ------------------------------------------------------------
-
-  void _startHungerTimer() {
-    // Cancel an existing timer first.
-    _hungerTimer?.cancel();
-
-    // Create exactly one hunger timer.
-    _hungerTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (timer) {
-        if (!mounted || _gameOver || _hasWon) {
-          timer.cancel();
-          return;
-        }
-
-        setState(() {
-          // Normal hunger increase.
-          if (_hunger < 100) {
-            _hunger = _clampMeter(_hunger + 5);
-          } else {
-            // If hunger is already 100,
-            // another tick keeps hunger at 100
-            // and reduces happiness by 20.
-            _hunger = 100;
-            _happiness = _clampMeter(_happiness - 20);
-          }
-        });
-
-        _updateOutcome();
-      },
-    );
-  }
-
-  // ------------------------------------------------------------
-  // LIFECYCLE
-  // ------------------------------------------------------------
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Start the hunger timer once.
-    _startHungerTimer();
-  }
-
-  @override
-  void dispose() {
-    // Cancel timers when leaving the screen.
-    _hungerTimer?.cancel();
-    _winTimer?.cancel();
-
-    super.dispose();
-  }
-
-  // ------------------------------------------------------------
-  // METER WIDGET
-  // ------------------------------------------------------------
-
-  Widget _buildMeter({
+  Widget buildMeter({
     required String label,
     required int value,
     required IconData icon,
@@ -352,9 +123,7 @@ class _DigitalPetScreenState extends State<DigitalPetScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
-
             LinearProgressIndicator(
               value: value / 100,
               minHeight: 10,
@@ -365,32 +134,22 @@ class _DigitalPetScreenState extends State<DigitalPetScreen> {
     );
   }
 
-  // ------------------------------------------------------------
-  // UI
-  // ------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
-    final actionsDisabled = _gameOver || _hasWon;
+    final disabled = pet.gameOver || pet.hasWon;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Digital Pet'),
         centerTitle: true,
       ),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-
           child: Column(
             children: [
-              // ------------------------------------------------
-              // PET NAME
-              // ------------------------------------------------
-
               Text(
-                _petName,
+                pet.petName,
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -399,34 +158,23 @@ class _DigitalPetScreenState extends State<DigitalPetScreen> {
 
               const SizedBox(height: 8),
 
-              // ------------------------------------------------
-              // MOOD
-              // ------------------------------------------------
-
               Text(
-                _hasWon
+                pet.hasWon
                     ? 'Best day ever!'
-                    : _gameOver
+                    : pet.gameOver
                         ? 'I need a rest.'
-                        : '$_mood pet',
+                        : '${pet.mood} pet',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
-                  color: _moodColor,
+                  color: moodColor,
                 ),
               ),
 
               const SizedBox(height: 24),
 
-              // ------------------------------------------------
-              // TEMPORARY PET DISPLAY
-              //
-              // Team 2 can replace this with the actual
-              // ColorFiltered pet asset later.
-              // ------------------------------------------------
-
               Text(
-                _petEmoji,
+                petEmoji,
                 style: const TextStyle(
                   fontSize: 100,
                 ),
@@ -434,52 +182,32 @@ class _DigitalPetScreenState extends State<DigitalPetScreen> {
 
               const SizedBox(height: 24),
 
-              // ------------------------------------------------
-              // HAPPINESS
-              // ------------------------------------------------
-
-              _buildMeter(
+              buildMeter(
                 label: 'Happiness',
-                value: _happiness,
+                value: pet.happiness,
                 icon: Icons.favorite,
               ),
 
-              // ------------------------------------------------
-              // HUNGER
-              // ------------------------------------------------
-
-              _buildMeter(
+              buildMeter(
                 label: 'Hunger',
-                value: _hunger,
+                value: pet.hunger,
                 icon: Icons.restaurant,
               ),
 
-              // ------------------------------------------------
-              // ENERGY
-              // ------------------------------------------------
-
-              _buildMeter(
+              buildMeter(
                 label: 'Energy',
-                value: _energy,
+                value: pet.energy,
                 icon: Icons.bolt,
               ),
 
               const SizedBox(height: 20),
 
-              // ------------------------------------------------
-              // FEED + PLAY
-              // ------------------------------------------------
-
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: actionsDisabled
-                          ? null
-                          : _feedPet,
-                      icon: const Icon(
-                        Icons.restaurant,
-                      ),
+                      onPressed: disabled ? null : pet.feed,
+                      icon: const Icon(Icons.restaurant),
                       label: const Text('Feed'),
                     ),
                   ),
@@ -488,9 +216,7 @@ class _DigitalPetScreenState extends State<DigitalPetScreen> {
 
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: actionsDisabled
-                          ? null
-                          : _playWithPet,
+                      onPressed: disabled ? null : pet.play,
                       icon: const Icon(
                         Icons.sports_tennis,
                       ),
@@ -502,32 +228,21 @@ class _DigitalPetScreenState extends State<DigitalPetScreen> {
 
               const SizedBox(height: 12),
 
-              // ------------------------------------------------
-              // RESET
-              // ------------------------------------------------
-
               OutlinedButton.icon(
-                onPressed: _resetPet,
+                onPressed: pet.reset,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Reset'),
               ),
 
               const SizedBox(height: 20),
 
-              // ------------------------------------------------
-              // STATUS MESSAGE
-              // ------------------------------------------------
-
               Text(
-                _gameOver
-                    ? 'Game over. Press Reset to care for your pet again.'
-                    : _hasWon
-                        ? 'Your pet stayed happy for three continuous minutes!'
+                pet.gameOver
+                    ? 'Game over. Press Reset to play again.'
+                    : pet.hasWon
+                        ? 'Your pet stayed happy for three minutes!'
                         : 'Keep your pet happy and well fed.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                ),
               ),
             ],
           ),
